@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: mosaikboxDB
+      MONGO_INITDB_ROOT_USERNAME: mosaikbox
+      MONGO_INITDB_ROOT_PASSWORD: password # please change this password before deploying
+    ports:
+        - "27017:27017"
+    volumes:
+      - mongodb:/data/db
+  keyfinder-service:
+    build:
+      context: KeyFinderService
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "50051:50051"
+
+volumes:
+  mongodb:
+  mosaikbox:

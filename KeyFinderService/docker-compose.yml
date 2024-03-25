@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  keyfinder-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+    ports:
+      - 50051:50051

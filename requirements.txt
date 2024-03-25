@@ -1,0 +1,44 @@
+librosa==0.10.1
+Cython==3.0.8
+matplotlib==3.8.2
+pydub==0.25.1
+pyloudnorm==0.1.1
+jams==0.3.4
+msaf==0.1.80
+soundfile==0.12.1
+tinytag==1.10.1 # for reading metadata from audio files
+
+# ADTLib dependencies
+scipy==1.11.4 # currently msaf is not compatible with scipy 1.12.0
+tensorflow==2.15.0
+ADTLib @ git+https://github.com/robaerd/ADTLib@master
+
+# pyrubberband dependencies
+pyrubberband @ git+https://github.com/bmcfee/pyrubberband@10634aa827447225ebf6d0c41a00c7b817f17d93 #  latest version of pyrubberband is not published as python package and thus needs to be installed manually, else the old "pysoundfile" dependency is installed instead fo the "soundfile" dependency
+numpy==1.23.5 # has to stay pinned to 1.23.5, as some dependency is not compatible with a higher version
+
+# BeatNet dependencies
+PyAudio==0.2.14
+madmom @ git+https://github.com/CPJKU/madmom@0551aa8f48d71a367d92b5d3a347a0cf7cd97cc9 # latest main branch contains bugfixes that are necessary
+BeatNet @ git+https://github.com/robaerd/BeatNet@main # using fork, as pinned version is causing issues
+
+# Keyfinder grpc dependencies
+grpcio==1.60.1
+grpcio-tools==1.60.1 # for compiling the proto file
+
+# demucs dependency
+demucs==4.0.1
+
+# lyrics dependencies
+lyricsgenius @ git+https://github.com/johnwmillr/LyricsGenius@aac9dad201bc012bf83283c7de779b7d95498756 # the master branch contains a fix that gets rid of metadata in the lyrics (https://github.com/johnwmillr/LyricsGenius/commit/a702f5f0161bfcb28dd52dbfa96ab3192c36ed93)
+
+# REST API
+uvicorn==0.27.0.post1
+fastapi==0.109.1
+python-multipart==0.0.7
+
+# contextual similarity
+sentence-transformers==2.3.1
+
+# mongodb
+mongoengine==0.27.0
