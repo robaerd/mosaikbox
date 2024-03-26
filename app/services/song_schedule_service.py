@@ -481,7 +481,7 @@ class SongScheduleService:
                 target_tempo=best_cand_target_tempo,
                 original_key=best_cand_original_key,
                 target_key=best_cand_target_key,
-                key_shift=best_cand_key_shift,
+                key_shift=int(best_cand_key_shift),
                 h_contr=float(h_cue),
                 l_contr=float(l_cue),
                 r_contr=float(r_cue),
