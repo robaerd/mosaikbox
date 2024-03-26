@@ -27,41 +27,36 @@ def process_audio(audio_path, session_id: str, mix_model: MixModel, plot_segment
 
 
 def process_audio_default(audio_path, session_id: str, plot_segments=False):
+    """
+    Mosaikbox is implemented in the main branch. You are on the AMU branch.
+    """
+    raise NotImplementedError("Mosaikbox is implemented in the main branch. You are on the AMU branch.")
+
+
+def process_audio_amu(audio_path, session_id: str, plot_segments=False):
+    logger.debug(f'Using amu analysis for song {audio_path} for session {session_id}')
     logger.debug(f'Using default analysis for song {audio_path} for session {session_id}')
-    # create separate client for each process
-    key_estimator_client = key_estimator.KeyEstimatorClient()
     # load audio
     audio, sr, audio_length = audio_loader.load(audio_path, sr=44100)
     # estimate beat grid and tempo
     beats, tempo = bts.determine_beats_and_tempo(audio_path=audio_path, audio_length=audio_length)
-
-    key = key_estimator_client.estimate_key(audio_path=audio_path)
-
     # calculate segments
     boundaries, labels = ss.calculate_song_boundaries(session_id=session_id, audio=audio, sr=sr,
                                                       audio_path=audio_path, beats=beats,
                                                       plot=plot_segments)
     segments = ss.process_song_boundaries_to_segment_timing(boundaries, labels, tempo, beats)
     segments = ss.calculate_segment_compatibility_based_on_labels(segments, audio_length=audio_length)
-    segments = ss.merge_similar_segment_boundaries(segments)
     downbeat_segments = ss.filter_and_move_segment_boundaries_to_downbeats(segments=segments, beats=beats, tempo=tempo)
-    downbeat_segments = ss.calculate_timbre_for_segments(audio, sr, beats, downbeat_segments)
 
     # transcribe percussion
     audio_percussion_quantized = rs.transcribe_percussion(audio, sr, beats[:, 0])
-
-    # load lyrics and calculate embedding
-    embeddings = calculate_lyrics_embeddings(session_id, audio_path)
-
-    # detect vocal segments
-    vocal_segments = vocal.find_vocal_segments(session_id, audio_path)
 
     # store analysis results to file
     analysis = AnalysisResult_ds.AnalysisResult(audio_path,
                                                 filename_with_hash=utilities.get_filename_with_hash(audio_path),
                                                 bpm=tempo,
                                                 target_bpm=None,
-                                                key=key,
+                                                key=None,
                                                 target_key=None,
                                                 beats=beats,
                                                 quantized_percussion=audio_percussion_quantized,
@@ -70,17 +65,10 @@ def process_audio_default(audio_path, session_id: str, plot_segments=False):
                                                 audio_length=audio_length,
                                                 time_until_first_beat_stretched=None,
                                                 stretch_playback_rate=None,
-                                                lyrics_embedding=embeddings,
-                                                vocal_segments=vocal_segments,
-                                                mix_model=MixModel.MOSAIKBOX)
+                                                lyrics_embedding=None,
+                                                vocal_segments=[],
+                                                mix_model=MixModel.AMU)
     analysis_store.save(analysis, session_id)
-
-
-def process_audio_amu(audio_path, session_id: str, plot_segments=False):
-    """
-    AMU analysis is implemented in the AMU git branch
-    """
-    raise NotImplementedError("AMU analysis is implemented in the AMU git branch")
 
 
 def calculate_lyrics_embeddings(session_id: str, audio_path: str) -> Optional[Tensor]:

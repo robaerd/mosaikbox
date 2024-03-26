@@ -105,6 +105,7 @@ def main_transition(base_audio: AudioSegment,
         drum_less_or_drum_and_vocal_less_audio[-cand_audio_seg7_start_transition_ending:],
         cand_audio_only_drum_stem[-cand_audio_seg7_start_transition_ending:], starting_factor=0.4, target_factor=0.1)
 
+
     if high_rhythmic_similarity:
         song2_seg1 = audio_filter.linear_low_filter(song2_seg1, target_factor=0.3, starting_factor=0.3)
         song2_seg2 = audio_filter.linear_low_filter(song2_seg2, target_factor=0.4, starting_factor=0.3)
@@ -122,6 +123,7 @@ def main_transition(base_audio: AudioSegment,
         song2_seg1 = audio_filter.linear_high_filter(song2_seg1, target_factor=0.6, starting_factor=0.3)
         song2_seg2 = audio_filter.linear_high_filter(song2_seg2, target_factor=0.8, starting_factor=0.6)
         song2_seg3 = audio_filter.linear_high_filter(song2_seg3, target_factor=1.0, starting_factor=0.8)
+
 
     song2_seg1 = audio_filter.linear_volume_transformation(song2_seg1, target_factor=1.0, starting_factor=0.0)
 
@@ -215,42 +217,23 @@ def rolling_transition(base_audio: AudioSegment, cand_audio: AudioSegment,
 
 
 def mix_songs(session_id: str, song_schedule: list[SongScheduleItem], is_drum_removal_enabled: bool,
-              is_vocal_removal_enabled) -> AudioSegment:
-    logger.info("Starting song mixing for session {}".format(session_id))
+                  is_vocal_removal_enabled) -> AudioSegment:
+    logger.debug("Using AMU mixing for session {}".format(session_id))
     mixed_song = None
-    previous_song_end_vocal_interval = []
     for idx, schedule in enumerate(song_schedule):
         logger.debug("Mixing song {} of {}".format(idx + 1, len(song_schedule)))
-
         audio_path = schedule.audio_path
         start_time = schedule.start_time
         end_time = schedule.end_time
         original_tempo = schedule.original_tempo
         target_tempo = schedule.target_tempo
         key_shift = schedule.key_shift
-        timbral_contr = schedule.timbral_contr
         rhytmic_contr = schedule.r_contr
         harmonic_contr = schedule.h_contr
-        current_vocal_intervals = schedule.vocal_intervals_time_stretched
 
         high_rhythmic_similarity = rhytmic_contr > 0.95
-        high_timbral_similarity = timbral_contr > 0.95
         high_harmonic_similarity = harmonic_contr > 0.9
 
-        should_remove_drum_stem = False
-        should_remove_drum_next_song = False
-        audio_segment_without_drum_stem = None
-        audio_segment_only_drum_stem = None
-
-        remove_end_vocals = False
-        audio_segment_without_vocal_stem = None
-        audio_segment_only_vocal_stem = None
-
-        audio_segment_without_drum_and_vocal_stem = None
-
-        rhythmic_contr_threshold = 0.95
-        if mixed_song is not None and rhytmic_contr < rhythmic_contr_threshold:
-            should_remove_drum_stem = is_drum_removal_enabled
 
         stretch_playback_rate = utilities.calculate_playback_rate(target_tempo=target_tempo,
                                                                   current_tempo=original_tempo)
@@ -266,67 +249,12 @@ def mix_songs(session_id: str, song_schedule: list[SongScheduleItem], is_drum_re
         # assume transition after 24 (down-)beats (rolling transition)
         rolling_transition_base_song_crossover = downbeat_duration * 24 * transition_scale_factor
 
-        rolling_transition_timbre_threshold = 0.98
-        rolling_transition_next_song = False
-        # transition = rolling_transition # we disabled the rolling transition for now
-        if len(song_schedule) > idx + 1:
-            timbral_contr_next_song = song_schedule[idx + 1].timbral_contr
-            rhythmic_contr_next_song = song_schedule[idx + 1].r_contr
-            start_time_next_song = song_schedule[idx + 1].start_time
-            vocal_intervals_next_song = song_schedule[idx + 1].vocal_intervals_time_stretched
-            original_tempo_next_song = song_schedule[idx + 1].original_tempo
-            target_tempo_next_song = song_schedule[idx + 1].target_tempo
-            stretch_playback_rate_next_song = utilities.calculate_playback_rate(target_tempo=target_tempo_next_song,
-                                                                                current_tempo=original_tempo_next_song)
-            stretch_factor_next_song = 1 / stretch_playback_rate_next_song
-            if timbral_contr_next_song >= rolling_transition_timbre_threshold:
-                logger.debug(
-                    f"Timbre contribution of next song is high: {timbral_contr_next_song}. Adjusting song boundaries for rolling transition.")
-                # rolling_transition_next_song = True  # we disabled the rolling transition for now
-                rolling_transition_next_song = False
-            if rhythmic_contr_next_song < rhythmic_contr_threshold:
-                should_remove_drum_next_song = is_drum_removal_enabled
-                logger.debug(
-                    f"Rhythmic contribution of next song is low: {rhythmic_contr_next_song}. Removing drum stem of next song to prepare for transition without drum stem.")
+        rolling_transition_next_song = False  # we disabled the rolling transition for now
 
-            current_song_end_time_stretched_ms = int(end_time * stretch_factor * 1000)
-            next_song_start_time_stretched_ms = int(start_time_next_song * stretch_factor_next_song * 1000)
-            remove_end_vocals = should_remove_end_vocals(current_vocal_intervals=current_vocal_intervals,
-                                                         current_song_end_time_stretched=current_song_end_time_stretched_ms,
-                                                         overlay_duration_before_transition_ms=int(
-                                                             beat_crossover_before_transition_point_seconds * 1000),
-                                                         overlay_duration_after_transition_ms=int(
-                                                             beat_crossover_after_transition_point_seconds * 1000),
-                                                         next_song_vocal_intervals=vocal_intervals_next_song,
-                                                         next_song_start_time_stretched=next_song_start_time_stretched_ms) and is_vocal_removal_enabled
-            logger.debug(f"Should remove vocals: {remove_end_vocals}")
-
-        # rolling_transition_current_song = False # we disabled the rolling transition for now
+        # rolling_transition_current_song = False
         transition = main_transition
-        if timbral_contr >= rolling_transition_timbre_threshold:
-            logger.debug(f"Timbre contribution is high: {timbral_contr}. Using rolling transition.")
-            # transition = rolling_transition # we disabled the rolling transition for now
-            transition = main_transition
 
         audio_segment, gain = load_and_normalize_audiosegment(audio_path)
-        if should_remove_drum_stem or should_remove_drum_next_song:
-            # remove drum stem
-            mss.mix_song_without_stem(session_id, audio_path, [mss.StemType.DRUMS])
-            audio_segment_without_drum_stem, _ = load_and_normalize_audiosegment(
-                mss.get_song_without_stem_filepath(session_id, audio_path, [mss.StemType.DRUMS]), manual_gain=gain)
-            audio_segment_only_drum_stem, _ = load_and_normalize_audiosegment(
-                mss.get_song_stem_filepath(session_id, audio_path, mss.StemType.DRUMS), manual_gain=gain)
-        if remove_end_vocals:
-            mss.mix_song_without_stem(session_id, audio_path, [mss.StemType.VOCALS])
-            audio_segment_without_vocal_stem, _ = load_and_normalize_audiosegment(
-                mss.get_song_without_stem_filepath(session_id, audio_path, [mss.StemType.VOCALS]), manual_gain=gain)
-            audio_segment_only_vocal_stem, _ = load_and_normalize_audiosegment(
-                mss.get_song_stem_filepath(session_id, audio_path, mss.StemType.VOCALS), manual_gain=gain)
-        if should_remove_drum_next_song and remove_end_vocals:
-            mss.mix_song_without_stem(session_id, audio_path, [mss.StemType.DRUMS, mss.StemType.VOCALS])
-            audio_segment_without_drum_and_vocal_stem, _ = load_and_normalize_audiosegment(
-                mss.get_song_without_stem_filepath(session_id, audio_path, [mss.StemType.DRUMS, mss.StemType.VOCALS]),
-                manual_gain=gain)
 
         if mixed_song is not None and start_time - beat_crossover_before_transition_point_seconds >= 0:
             start_time -= beat_crossover_before_transition_point_seconds
@@ -334,10 +262,10 @@ def mix_songs(session_id: str, song_schedule: list[SongScheduleItem], is_drum_re
             logger.warning("Can not adjust start time to fit transition. Start time is too early.")
             raise ValueError("Can not adjust end time to fit transition. Start time is too early.")
 
+
         song_length_seconds = stretch_factor * (len(audio_segment) / 1000.0)
         if idx < len(song_schedule) - 1:
-            if rolling_transition_next_song and (
-                    end_time + rolling_transition_base_song_crossover < song_length_seconds):
+            if rolling_transition_next_song and (end_time + rolling_transition_base_song_crossover < song_length_seconds):
                 end_time += rolling_transition_base_song_crossover
             elif (not rolling_transition_next_song) and (
                     end_time + beat_crossover_after_transition_point_seconds < song_length_seconds):
@@ -347,25 +275,9 @@ def mix_songs(session_id: str, song_schedule: list[SongScheduleItem], is_drum_re
                     f"Can not adjust end time to fit transition. End time is too late: end_time={end_time}, song_length_seconds={song_length_seconds}")
                 raise ValueError("Can not adjust end time to fit transition. End time is too late.")
 
+
         audio_segment = extract_and_prepare_audio_segment(audio_segment, start_time, end_time, stretch_playback_rate,
                                                           key_shift)
-        audio_segment_without_drum_stem = extract_and_prepare_audio_segment(audio_segment_without_drum_stem, start_time,
-                                                                            end_time, stretch_playback_rate,
-                                                                            key_shift) if should_remove_drum_stem or should_remove_drum_next_song else audio_segment_without_drum_stem
-        audio_segment_only_drum_stem = extract_and_prepare_audio_segment(audio_segment_only_drum_stem, start_time,
-                                                                         end_time, stretch_playback_rate,
-                                                                         key_shift) if should_remove_drum_stem or should_remove_drum_next_song else audio_segment_only_drum_stem
-        audio_segment_without_vocal_stem = extract_and_prepare_audio_segment(audio_segment_without_vocal_stem,
-                                                                             start_time, end_time,
-                                                                             stretch_playback_rate,
-                                                                             key_shift) if remove_end_vocals else audio_segment_without_vocal_stem
-        audio_segment_only_vocal_stem = extract_and_prepare_audio_segment(audio_segment_only_vocal_stem, start_time,
-                                                                          end_time, stretch_playback_rate,
-                                                                          key_shift) if remove_end_vocals else audio_segment_only_vocal_stem
-        audio_segment_without_drum_and_vocal_stem = extract_and_prepare_audio_segment(
-            audio_segment_without_drum_and_vocal_stem, start_time, end_time, stretch_playback_rate,
-            key_shift) if should_remove_drum_next_song and remove_end_vocals else audio_segment_without_drum_and_vocal_stem
-
         if idx == 0 or mixed_song is None:
             mixed_song = audio_segment
         else:
@@ -375,18 +287,18 @@ def mix_songs(session_id: str, song_schedule: list[SongScheduleItem], is_drum_re
                 remove_drum_cand_ending_beats = 24  # 16.25
             mixed_song = transition(base_audio=mixed_song,
                                     cand_audio=audio_segment,
-                                    cand_audio_without_drum_stem=audio_segment_without_drum_stem,
-                                    cand_audio_only_drum_stem=audio_segment_only_drum_stem,
-                                    cand_audio_without_vocal_stem=audio_segment_without_vocal_stem,
-                                    cand_audio_only_vocal_stem=audio_segment_only_vocal_stem,
-                                    cand_audio_without_vocal_and_drum_stem=audio_segment_without_drum_and_vocal_stem,
-                                    remove_drum_cand_beginning=should_remove_drum_stem,
-                                    remove_drum_cand_ending=should_remove_drum_next_song,
+                                    cand_audio_without_drum_stem=None,
+                                    cand_audio_only_drum_stem=None,
+                                    cand_audio_without_vocal_stem=None,
+                                    cand_audio_only_vocal_stem=None,
+                                    cand_audio_without_vocal_and_drum_stem=None,
+                                    remove_drum_cand_beginning=False,
+                                    remove_drum_cand_ending=False,
                                     remove_drum_cand_ending_beats=remove_drum_cand_ending_beats,
-                                    remove_end_vocals=remove_end_vocals,
+                                    remove_end_vocals=False,
                                     downbeat_duration_ms=int(downbeat_duration * 1000),
                                     high_rhythmic_similarity=high_rhythmic_similarity,
-                                    high_timbral_similarity=high_timbral_similarity,
+                                    high_timbral_similarity=False,
                                     high_harmonic_similarity=high_harmonic_similarity,
                                     transition_scale_factor=transition_scale_factor)
 

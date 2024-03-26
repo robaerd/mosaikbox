@@ -43,16 +43,14 @@ def calculate_song_boundaries(session_id: str, audio: np.ndarray, sr: int, audio
     convert_beats_to_jams_and_save(audio, sr, destination_jam_name, beats, segmentation_data_path)
     # configure parameters
     feature = "mfcc"
-    bid = "sf"
-    lid = "fmc2d"
+    bid = "foote"
     annot_beats = True
     # set the features_tmp_file to prevent race conditions
     msaf.config.features_tmp_file = os.path.join(segmentation_data_path, 'features_tmp',
                                                  f".features_tmp_file_{destination_audio_name}.json")
     boundaries, labels = msaf.process(destination_audio_path, boundaries_id=bid, feature=feature,
-                                      annot_beats=annot_beats, labels_id=lid, plot=plot)
+                                      annot_beats=annot_beats, plot=plot)
     logger.debug(f"Boundaries for {audio_path}: {boundaries}")
-    logger.debug(f"Labels for {audio_path}: {labels}")
 
     return boundaries, labels
 
@@ -108,46 +106,17 @@ def find_nearest_idx(array: np.ndarray, value):
 def calculate_segment_compatibility_based_on_labels(_segments: list[Segment], audio_length: float):
     segments = copy.deepcopy(_segments)
 
-    intro_outro_compatibility = 0.5
-    if len(segments) == 1:
-        # we penalize songs with only one segment
-        segments[0].compatibility = intro_outro_compatibility
-        return segments
-
-    intro_segment_label = segments[0].label
-    outro_segment_label = segments[-1].label
-
-    segments_without_intro_outro = list(
-        filter(lambda x: (x.label not in [intro_segment_label, outro_segment_label]), segments))
-
-
-    # Calculate the frequency of each label
-    label_freq = Counter(attrgetter("label")(seg) for seg in segments_without_intro_outro)
-    # Sort labels by count in descending order
-    sorted_label_counts = sorted(label_freq.items(), key=itemgetter(1), reverse=True)
-
-    weight = 1.0
-    for key, occurrences in sorted_label_counts:
-        for segment in segments:
-            if segment.label == key:
-                segment.compatibility = weight
-        # weight -= 0.10
-
-    # set intro and outro weights and all sections that match their label
-    if weight < intro_outro_compatibility:
-        intro_outro_compatibility = weight
-    for segment in segments:
-        if segment.label in [intro_segment_label, outro_segment_label]:
-            segment.compatibility = intro_outro_compatibility
-
     # we want to prevent too early and too late segments to be able to do transitions
     for segment in segments:
         if segment.start_time - SEGMENT_MIN_TRANSITION_OFFSET < 0.0:
             logger.debug(f"Penalizing segment, because it starts too early: start_time: {segment.start_time} < segment_min_transition_offset: {SEGMENT_MIN_TRANSITION_OFFSET}")
             segment.compatibility = 0.0
+            continue
         if segment.end_time + SEGMENT_MIN_TRANSITION_OFFSET > audio_length:
             logger.debug(f"Penalizing segment, because it ends too late: end_time + segment_min_transition_offset: {segment.end_time + SEGMENT_MIN_TRANSITION_OFFSET} > audio_length: {audio_length}")
             segment.compatibility = 0.0
+            continue
+        segment.compatibility = 1.0
 
     return segments
 

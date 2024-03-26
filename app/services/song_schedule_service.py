@@ -278,10 +278,6 @@ class SongScheduleService:
         cand_analysis.quantized_percussion = rs.adjust_beat_timing_to_start_at_0(cand_analysis.quantized_percussion)
         cand_analysis.beats = rs.adjust_beat_timing_to_start_at_0(cand_analysis.beats)
 
-        beat_synced_timbre_vectors = ss.map_segments_timbre_to_beat_timbre(cand_analysis.downbeat_segments,
-                                                                           beats=cand_analysis.beats,
-                                                                           time_until_first_beat=cand_analysis.time_until_first_beat_stretched)
-
         # calculate similarity for each beat shift
         mash_res = mixability.calc_mixability(session_id=session_id,
                                               audio1_vector=base_segment_audio,
@@ -292,7 +288,7 @@ class SongScheduleService:
                                               audio2_beats=cand_analysis.beats,
                                               audio1_key=base_target_key,
                                               audio2_key=cand_analysis.key,
-                                              audio2_beat_sync_timbre=beat_synced_timbre_vectors,
+                                              audio2_beat_sync_timbre=None,
                                               audio1_sr=base_analysis.sample_rate,
                                               audio2_sr=cand_sr,
                                               enable_contextual_similarity=is_contextual_similarity_enabled,
@@ -395,7 +391,7 @@ class SongScheduleService:
                         cand_analysis=cand_analysis_data,
                         is_contextual_similarity_enabled=is_contextual_similarity_enabled)
 
-                    res_mixability, p_shift, key_shift, b_offset, harmonic_sim_k, spectral_balance_k, rhythm_sim_k, key_sim_k, timbre_sim_k, mixability_k = segment_similarities
+                    res_mixability, p_shift, key_shift, b_offset, harmonic_sim_k, spectral_balance_k, rhythm_sim_k, _, _, mixability_k = segment_similarities
 
                     # additional weighting
                     segment_weighting_vector = self.create_beat_compatibility_vector_from_segments(
@@ -430,7 +426,7 @@ class SongScheduleService:
                     h_cue = harmonic_sim_k[b_offset_segment_weighted]
                     l_cue = spectral_balance_k[b_offset_segment_weighted]
                     r_cue = rhythm_sim_k[b_offset_segment_weighted]
-                    timbre_contr = timbre_sim_k[b_offset_segment_weighted]
+                    timbre_contr = 0
                     segment_factor = segment_weighting_vector[b_offset_segment_weighted]
 
                     try:
@@ -471,8 +467,7 @@ class SongScheduleService:
             h_cue, l_cue, r_cue, timbre_contr, segment_factor = best_cand_similarities
 
             best_cand_original_key = base_analysis_segment.key
-            best_cand_target_key = key_distance.get_key_by_relative_semitone(best_cand_original_key,
-                                                                             best_cand_key_shift)
+            best_cand_target_key = str(best_cand_key_shift)
 
             # update base_analysis_segment
             song_schedule_item_best_cand = SongScheduleItem(

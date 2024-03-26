@@ -69,19 +69,9 @@ def calc_mixability(session_id: str,
     # Calculate M_L
     spectral_balance_k = _calc_spectral_balance(base_beat_sync_spectrum, cand_beat_sync_spectrum, base_beat_length,
                                                 n_max_b_shifts)
-    # Reward downbeats (currently not used)
-    downbeat_reward_k = _calc_downbeat_reward(audio2_beats, n_max_b_shifts)
-    # Calculate M_T
-    timbre_sim_k = _calc_timbral_similarity(audio1_vector, audio1_beats, audio1_sr, n_max_b_shifts,
-                                            audio2_beat_sync_timbre)
-    # Calculate M_K and D_K
-    key_shift, key_sim_k = _calc_key_shift_and_key_similarity(audio1_key, audio2_key, n_max_b_shifts)
-    # Calculate M_C
-    contextual_sim = _calc_contextual_similarity(audio1_lyrics_embedding, audio2_lyrics_embedding,
-                                                 enable_contextual_similarity)
 
     # Calculate mixability
-    mixability = 0.3 * rhythm_sim_k + timbre_sim_k * 0.75 + 0.2 * key_sim_k + harmonic_sim_k * 0.2 + spectral_balance_k * 0.1 + contextual_sim * 0.25
+    mixability = 0.2 * rhythm_sim_k + 1.0 * harmonic_sim_k + spectral_balance_k * 0.2
     b_offset = np.argmax(mixability)
 
     # AMU pitch shift approach
@@ -90,7 +80,7 @@ def calc_mixability(session_id: str,
     p_shift = -p_shift
 
     return np.max(
-        mixability), p_shift, key_shift, b_offset, harmonic_sim_k, spectral_balance_k, rhythm_sim_k, key_sim_k, timbre_sim_k, mixability
+        mixability), p_shift, p_shift, b_offset, harmonic_sim_k, spectral_balance_k, rhythm_sim_k, None, None, mixability
 
 
 def _calc_harmonic_similarity(base_beat_sync_chroma: np.ndarray, candidate_beat_sync_chroma: np.ndarray) -> (
@@ -134,48 +124,6 @@ def _calc_spectral_balance(base_beat_sync_spectrum, cand_beat_sync_spectrum, bas
         beta_norm = beta / np.sum(beta)
         spectral_balance_k[i] = 1 - np.std(beta_norm)
     return spectral_balance_k
-
-
-def _calc_downbeat_reward(audio2_beats, n_max_b_shifts):
-    downbeat_reward_k = np.zeros(n_max_b_shifts + 1)
-    for i in range(n_max_b_shifts):
-        # we extract the percussion based on the beats as percussion are quantized over 12 equal positions over each beat
-        beat_start = audio2_beats[i]
-        if beat_start[1] == 1.0:
-            downbeat_reward_k[i] = 1.0
-        else:
-            downbeat_reward_k[i] = 0.0
-    return downbeat_reward_k
-
-
-def _calc_timbral_similarity(audio1_vector, audio1_beats, audio1_sr, n_max_b_shifts, audio2_beat_sync_timbre):
-    audio1_timbre_vectors = timbre_calculation.calculate_timbre(audio1_vector, audio1_sr, audio1_beats[:, 0])
-    timbre_sim_k = np.zeros(n_max_b_shifts + 1)
-    for i in range(n_max_b_shifts + 1):
-        audio2_timbre_vector = audio2_beat_sync_timbre[i]
-        timbre_sim_k[i] = calculate_timbre_similarity(audio1_timbre_vectors,
-                                                      audio2_timbre_vector) if audio2_timbre_vector is not None else 0.0
-    return timbre_sim_k
-
-
-def _calc_key_shift_and_key_similarity(audio1_key, audio2_key, n_max_b_shifts):
-    key_mas = calculate_key_similarity(audio1_key, audio2_key)
-    key_shift, _ = key_distance_harmonic(audio1_key, audio2_key)
-    key_sim_k = np.zeros(n_max_b_shifts + 1)
-    for i in range(n_max_b_shifts):
-        key_sim_k[i] = key_mas
-    return key_shift, key_sim_k
-
-
-def _calc_contextual_similarity(audio1_lyrics_embedding: Tensor, audio2_lyrics_embedding: Tensor,
-                                enable_contextual_similarity: bool):
-    contextual_sim = 0.0
-    if enable_contextual_similarity and audio1_lyrics_embedding is not None and audio2_lyrics_embedding is not None:
-        contextual_similarity_tensor = TextSimilarity.embedding_similarity(audio1_lyrics_embedding,
-                                                                           audio2_lyrics_embedding)
-        contextual_sim = contextual_similarity_tensor.item()
-    return contextual_sim
-
 
 def _calc_beat_sync_chroma_and_spectrum(eql_y, sr, beats, beat_sync_chroma_and_spectrum_path):
     try:
