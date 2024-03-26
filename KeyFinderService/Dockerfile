@@ -9,15 +9,14 @@ RUN dnf update -y && dnf install -y \
     pkg-config \
     cmake \
     git \
-    gcc \
-    g++ \
+    clang \
     curl \
     wget \
     unzip
 
 # Set clang as default C and C++ compiler
-ENV CC=/usr/bin/gcc
-ENV CXX=/usr/bin/g++
+ENV CC=/usr/bin/clang
+ENV CXX=/usr/bin/clang++
 
 ENV MY_INSTALL_DIR=/usr/local
 

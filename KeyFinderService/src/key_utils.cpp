@@ -6,11 +6,16 @@
 
 KeyFinder::AudioData loadAudioDataFromPCM(const keyfinder::KeyRequest* request) {
     spdlog::debug("Loading AudioData from in-memory PCM data");
+
+    // we assume that the PCM data is in 32-bit float format as most platforms should adhere to the IEEE 754 standard
+    // since float32_t is not yet implemented in clang, we opted to use this assert
+    static_assert(sizeof(float) * CHAR_BIT == 32, "float is not 32 bits on this platform");
+
     std::vector<float> pcmData;
-    pcmData.resize(request->pcm_data().size() / sizeof(float32_t));
+    pcmData.resize(request->pcm_data().size() / sizeof(float));
     std::memcpy(pcmData.data(), request->pcm_data().data(), request->pcm_data().size());
 
-    spdlog::trace("Size of pcm data: {} bytes", pcmData.size() * sizeof(float32_t));
+    spdlog::trace("Size of pcm data: {} bytes", pcmData.size() * sizeof(float));
 
     // Create an AudioData object and fill it with the samples
     KeyFinder::AudioData audioData;
