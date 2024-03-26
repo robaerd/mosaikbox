@@ -39,4 +39,4 @@ uvicorn app.main:app
 ```
 
 ## Frontend
-The frontend is available at [mosaikbox-frontend](github.com/...)
+The frontend is available at [mosaikbox-frontend](https://github.com/robaerd/mosaikbox)
