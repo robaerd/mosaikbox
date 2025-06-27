@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package keyfinder;
+
+message KeyRequest {
+    bytes pcm_data = 1;
+    int64 channels = 2;
+    int64 frame_rate = 3;
+}
+
+message KeyResponse {
+    string key = 1;
+}
+
+service KeyFinder {
+    rpc GetKey (KeyRequest) returns (KeyResponse);
+}
